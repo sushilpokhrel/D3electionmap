@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+#map{
+    margin-top: 50px;
+    text-align: center;
+}
+.county-border {
+    fill: none;
+    stroke: white;
+}
+.axis text {
+    font: 10px sans-serif;
+}
+
+.axis line, .axis path {
+    fill: none;
+    stroke: #000;
+    shape-rendering: crispEdges;
+}
+
+#key	{
+    position: absolute;
+    top:90px;
+    left: 50px;
+
+}
+#tooltip {
+position: absolute;
+padding: 10px;
+background-color: #ccc;
+-webkit-border-radius: 5px;
+-moz-border-radius: 5px;
+-o-border-radius: 5px;
+border-radius: 5px;
+-webkit-box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+-moz-box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+pointer-events: none;
+}
+
+#tooltip.hidden {
+display: none;
+}
+
+</style>
+<body>
+<div id="map"></div>
+<div id="tooltip" class="hidden">
+	<p><span id="value"></span></p>
+<script src="//d3js.org/d3.v3.min.js" charset="utf-8"></script>
+<script src="//d3js.org/topojson.v1.min.js"></script>
+<script>
+
+
+
+var width = 900,
+    height = 500;
+var divNode = d3.select('#map').node();
+var projection = d3.geo.mercator().scale(5300).translate([width / 2, height / 2]).center([83.985593872070313, 28.465876770019531]);
+ 
+
+var path = d3.geo.path()
+    .projection(projection);
+
+var svg = d3.select("#map").append("svg")
+    .attr("width", width)
+    .attr("height", height);
+d3.json("npd.json", function(error, uk) {
+	var counties = topojson.feature(uk, uk.objects.nepal_districts);
+	
+ d3.csv("https://raw.githubusercontent.com/aayushrijal/Nepal-district-topojson/master/district.csv",function(data){
+        var valueById = {};
+        data.forEach(function(d){
+            valueById[d.district] = d.value;
+        });
+	//counties
+    	svg.append("g")
+            .attr("class", "county")
+            .selectAll("path")
+            .data(counties.features)
+            .enter()
+            .append("path")
+            .attr("d", path)
+            .style("fill", function(d) {
+                if(valueById[d.properties.DISTRICT]){
+                    return "#000";
+                    // return color(valueById[d.properties.DISTRICT]);
+                }
+    		return "#ccc";
+    	});
+
+        var radius = d3.scale.sqrt()
+            .domain([0, 1e6])
+            .range([0, 20]);
+
+        svg.selectAll("circle")
+            .data(counties.features)
+            .enter()
+            .append("svg:circle")
+            .attr("transform", function(d) { return "translate(" + path.centroid(d) + ")"; })
+            .attr("r", function(d) {
+                if (valueById[d.properties.DISTRICT]) {
+                    // return valueById[d.properties.DISTRICT];
+                    return radius(valueById[d.properties.DISTRICT])*150;
+                }
+             })
+             .attr("fill","#FC8D59")
+             .attr("opacity","0.6")
+			 .on("mousemove", function(d){
+                       var absoluteMousePos = d3.mouse(divNode);
+                       d3.select("#tooltip")
+                           .style("left", absoluteMousePos[0]+ 10 + "px")
+                           .style("top", absoluteMousePos[1]+ 15 + "px")
+                           .select("#value")
+                           .attr("class","font")
+                           .html(function(){
+							   return "<strong>"+ d.properties.DISTRICT +"</strong> " + "<br>" +"Organization Count: <strong>" + valueById[d.properties.DISTRICT] + "</strong> ";
+						   });
+
+                       d3.select("#tooltip").classed("hidden", false);
+                   })
+                   .on("mouseout",function(){
+                       d3.select("#tooltip").classed("hidden", true);
+                   });
+
+    	//county borders
+    	svg.append("path").datum(topojson.mesh(uk, uk.objects.nepal_districts, function(a, b) {
+    		return a !== b;
+    	})).attr("class", "county-border").attr("d", path);
+    });
+  if (error) return console.error(error);
+ 	
+});
+
+
+
+
+</script>
